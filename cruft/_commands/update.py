@@ -254,6 +254,54 @@ def _apply_patch(diff: str, expanded_dir_path: Path, allow_untracked_files: bool
         _apply_patch_with_rejections(diff, expanded_dir_path)
 
 
+def _merge_rejections(project_dir: Path, current_template_dir: Path, new_template_dir: Path):
+    process = run(
+        ["git", "status", "--porcelain"],
+        stderr=PIPE,
+        stdout=PIPE,
+        check=True,
+        cwd=project_dir,
+    )
+    status = process.stdout.decode().strip().splitlines()
+    for line in status:
+        if not (line.startswith("??") and line.endswith(".rej")):
+            continue
+        filename = line[3:-4]
+        run(
+            ["git", "checkout", "--", filename],
+            stderr=PIPE,
+            stdout=PIPE,
+            check=True,
+            cwd=project_dir,
+        )
+        # git merge-file
+        cmd = [
+            "git",
+            "merge-file",
+            "-L",
+            "before-updating",
+            "-L",
+            "last update",
+            "-L",
+            "after-updating",
+            filename,
+            str(current_template_dir / filename),
+            str(new_template_dir / filename),
+        ]
+        try:
+            process = run(
+                cmd,
+                stderr=PIPE,
+                stdout=PIPE,
+                check=True,
+                cwd=project_dir,
+            )
+            typer.secho(process.stdout.decode(), err=False)
+        except CalledProcessError as error:
+            typer.secho(error.stderr.decode(), err=True)
+        Path(project_dir / f"{filename}.rej").unlink()
+
+
 def _apply_project_updates(
     old_main_directory: Path,
     new_main_directory: Path,
@@ -291,4 +339,5 @@ def _apply_project_updates(
 
     if not skip_update and diff.strip():
         _apply_patch(diff, project_dir, allow_untracked_files)
+        _merge_rejections(project_dir, old_main_directory, new_main_directory)
     return True
