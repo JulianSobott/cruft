@@ -296,9 +296,9 @@ def _merge_rejections(project_dir: Path, current_template_dir: Path, new_templat
                 check=True,
                 cwd=project_dir,
             )
-            typer.secho(process.stdout.decode(), err=False)
+            typer.secho(f"Applied 3-way-merge to file {filename}", err=False)
         except CalledProcessError as error:
-            typer.secho(error.stderr.decode(), err=True)
+            typer.secho(f"Error resolving merge for {filename} with error: {error.stderr.decode()}", err=True)
         Path(project_dir / f"{filename}.rej").unlink()
 
 
